@@ -46,11 +46,13 @@ def pyls_lint(config, document):
         args = ['--incremental',
                 '--show-column-numbers',
                 '--follow-imports', 'silent',
+                '--ignore-missing-imports',
                 '--command', document.source]
     else:
         args = ['--incremental',
                 '--show-column-numbers',
                 '--follow-imports', 'silent',
+                '--ignore-missing-imports',
                 document.path]
 
     report, errors, _ = mypy_api.run(args)
