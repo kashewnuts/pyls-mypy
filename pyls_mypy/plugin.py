@@ -1,4 +1,5 @@
 import re
+import tempfile
 from mypy import api as mypy_api
 from pyls import hookimpl
 
@@ -6,10 +7,10 @@ line_pattern = r"([^:]+):(?:(\d+):)?(?:(\d+):)? (\w+): (.*)"
 
 
 def parse_line(line, document=None):
-    '''
+    """
     Return a language-server diagnostic from a line of the Mypy error report;
     optionally, use the whole document to provide more context on it.
-    '''
+    """
     result = re.match(line_pattern, line)
     if result:
         _, lineno, offset, severity, msg = result.groups()
@@ -42,20 +43,22 @@ def parse_line(line, document=None):
 @hookimpl
 def pyls_lint(config, document):
     live_mode = config.plugin_settings('pyls_mypy').get('live_mode', True)
+    args = ['--incremental',
+            '--show-column-numbers',
+            '--follow-imports', 'silent',
+            '--ignore-missing-imports']
     if live_mode:
-        args = ['--incremental',
-                '--show-column-numbers',
-                '--follow-imports', 'silent',
-                '--ignore-missing-imports',
-                '--command', document.source]
-    else:
-        args = ['--incremental',
-                '--show-column-numbers',
-                '--follow-imports', 'silent',
-                '--ignore-missing-imports',
-                document.path]
+        with tempfile.NamedTemporaryFile('w') as fp:
+            fp.write(document.source)
+            fp.flush()
 
-    report, errors, _ = mypy_api.run(args)
+            args.append('--command')
+            args.append(document.source)
+
+            report, errors, _ = mypy_api.run(args)
+    else:
+        args.append(document.path)
+        report, errors, _ = mypy_api.run(args)
 
     diagnostics = []
     for line in report.splitlines():
